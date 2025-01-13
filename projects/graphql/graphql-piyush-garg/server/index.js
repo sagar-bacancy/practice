@@ -1,3 +1,10 @@
+// @apollo/server: The core Apollo Server package.
+// graphql: The GraphQL package.
+// @graphql/subscriptions: Provides the PubSub class to handle the publish-subscribe pattern.
+// ws: A WebSocket implementation needed for subscriptions.
+
+// Starting from Apollo Server 4, the support for subscriptions is handled by a separate package like graphql-ws or subscriptions-transport-ws. As of Apollo Server 4, the built-in support for subscriptions using subscriptions-transport-ws has been removed, and graphql-ws is recommended for handling subscriptions.
+
 const express = require("express");
 const { ApolloServer } = require("@apollo/server");
 const { expressMiddleware } = require("@apollo/server/express4");
@@ -30,8 +37,16 @@ async function startServer() {
   const server = new ApolloServer({
     typeDefs: `
             # This "User" type defines the queryable fields for every user in our data source.
+            # pass description to the type using """
+            """You can introspect this Description of a type User from the query's default __type or __schema fields, but only if introspection is on."""
             type User {
+                """
+                The ID of the user.
+                """
                 id: ID!
+                """
+                The name of the user.
+                """
                 name: String!
                 username: String!
                 email: String!
@@ -53,8 +68,16 @@ async function startServer() {
                 getUser(id: ID!): User
             }
 
+            input TodoInput {
+              userId: ID!
+              title: String!
+              completed: Boolean!
+            }
+
             type Mutation {
-                createTodo(userId: ID!, title: String!, completed: Boolean!): Todo
+                createTodo(input:TodoInput): Todo # take input type as argument
+                # or
+                # createTodo(userId: ID!, title: String!, completed: Boolean!): Todo # if you don't want to use input type
             }
         `,
     resolvers: {
@@ -72,8 +95,16 @@ async function startServer() {
       Query: {
         // API logic like Database operations or API calls can be performed in the resolvers.
         // getTodos: () => [{ id: 1, title: 'Learn GraphQL', completed: false }]
-        getTodos: async () =>
-          (await axios.get("https://jsonplaceholder.typicode.com/todos")).data,
+        getTodos: async () => {
+          try {
+            return (
+              await axios.get("https://jsonplaceholder.typicode.com/todos")
+            ).data;
+          } catch (error) {
+            console.log({error});
+            throw new Error("something went wrong");
+          }
+        },
         getAllUsers: async () =>
           (await axios.get("https://jsonplaceholder.typicode.com/users")).data,
 
@@ -96,13 +127,27 @@ async function startServer() {
         },
       },
       Mutation: {
-        createTodo: async (parent, {userId, title, completed}) => {
-            const newUser = {userId, title, completed}
-            const {data} = await axios.post('https://jsonplaceholder.typicode.com/todos', newUser)
-            return data
-        }
-      }
+        // createTodo: async (parent, {userId, title, completed}) => {
+        createTodo: async (parent, { input: { userId, title, completed } }) => {
+          const newUser = { userId, title, completed };
+          const { data } = await axios.post(
+            "https://jsonplaceholder.typicode.com/todos",
+            newUser
+          );
+          return data;
+        },
+      },
     },
+    introspection: true, // you can not introspect the schema if it is false
+    // introspection: process.env.NODE_ENV !== 'production', // Disable introspection in production
+    formatError: (err) => {
+    // Customize error formatting
+    return {
+      message: err.message,
+      code: err.extensions.code,
+      locations: err.locations,
+    };
+  }
   });
 
   app.use(cors());
@@ -114,9 +159,9 @@ async function startServer() {
     expressMiddleware(server, {
       // Your async context function should async and
       // return an object
-    //   context: async ({ req, res }) => ({
-    //     authScope: getScope(req.headers.authorization),
-    //   }),
+      //   context: async ({ req, res }) => ({
+      //     authScope: getScope(req.headers.authorization),
+      //   }),
     })
   ); // Adding Apollo Server as middleware
 

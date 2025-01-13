@@ -14,6 +14,26 @@ function App() {
           username
         }
       }
+      __schema {
+        # get all types and fields
+        types {
+          name
+          description
+          fields {
+            name
+            description
+          }
+        }
+      }
+      # __type(name: $name) {
+      #   # get specific type and fields
+      #   name
+      #   description
+      #   fields {
+      #     name
+      #     description
+      #   }
+      # }
     }
   `;
 
@@ -35,8 +55,8 @@ function App() {
   });
 
   const createTodoQuery = gql`
-    mutation CreateTodo($userId: ID!, $title: String!, $completed: Boolean!) {
-      createTodo(userId: $userId, title: $title, completed: $completed) {
+    mutation Mutation($input: TodoInput) {
+      createTodo(input: $input) {
         id
         title
         completed
@@ -44,6 +64,9 @@ function App() {
           id
           name
           username
+          email
+          phone
+          website
         }
       }
     }
@@ -65,9 +88,11 @@ function App() {
         onClick={() =>
           createTodo({
             variables: {
-              userId: "1",
-              title: "Random Title",
-              completed: false,
+              input: {
+                userId: "1",
+                title: "Random Title",
+                completed: false,
+              }
             },
           })
         }
